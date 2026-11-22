@@ -1,0 +1,23 @@
+MRI Digital Twin – third-party notice
+
+The contrast lab uses grey and white matter maps from the MNI ICBM152 2009a
+nonlinear symmetric template, as distributed with the nilearn library.
+
+Copyright (C) 1993-2009 Louis Collins, McConnell Brain Imaging Centre,
+Montreal Neurological Institute, McGill University. Permission to use, copy,
+modify, and distribute this software and its documentation for any purpose
+and without fee is hereby granted, provided that the above copyright notice
+appear in all copies. The authors and McGill University make no
+representations about the suitability of this software for any purpose. It
+is provided "as is" without express or implied warranty. The authors are not
+responsible for any data loss, equipment damage, property loss, or injury to
+subjects or patients resulting from the use or misuse of this software
+package.
+
+References:
+Fonov VS, Evans AC, Botteron K, Almli CR, McKinstry RC, Collins DL. Unbiased
+average age-appropriate atlases for pediatric studies. NeuroImage.
+2011;54(1):313-327.
+Fonov VS, Evans AC, McKinstry RC, Almli CR, Collins DL. Unbiased nonlinear
+average age-appropriate brain templates from birth to adulthood. NeuroImage.
+2009;47(Suppl 1):S102.
