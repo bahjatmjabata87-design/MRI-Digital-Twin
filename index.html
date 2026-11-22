@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRI Digital Twin – Safety & Contrast Lab v1.0</title>
+<style>
+:root{--navy:#0B1D51;--ind:#3A0CA3;--blue:#4361EE;--cyan:#00B4D8;--bg:#F5F7FB;--ink:#1B1F3B;--muted:#5A6472;--card:#fff;--z1:#06D6A0;--z2:#FFD166;--z3:#F78C6B;--z4:#EF476F}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(90deg,var(--navy),var(--ind),var(--blue),var(--cyan));color:#fff;padding:18px 20px}
+header h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;opacity:.9;font-size:14px}
+nav{display:flex;gap:8px;padding:12px 20px;background:#fff;border-bottom:1px solid #e3e7ef;flex-wrap:wrap}
+nav button{border:1px solid #cfd6e4;background:#fff;color:var(--ink);padding:8px 14px;border-radius:20px;font-weight:600;cursor:pointer;font-size:14px}
+nav button.on{background:var(--ind);color:#fff;border-color:var(--ind)}
+main{padding:16px 20px;max-width:1200px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:16px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(20,30,60,.08)}
+#scene{width:100%;height:460px;border-radius:14px;overflow:hidden;background:#dfe6f2;position:relative}
+#scene canvas{display:block}
+#warn{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--z4);color:#fff;font-weight:700;padding:8px 14px;border-radius:10px;display:none;font-size:14px;text-align:center;max-width:90%}
+.zbtn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid #e3e7ef;background:#fff;padding:8px 10px;border-radius:10px;margin:6px 0;cursor:pointer;font-size:14px;color:var(--ink)}
+.zbtn.on{outline:2px solid var(--ind)}
+.sw{width:18px;height:18px;border-radius:5px;flex:none}
+h2{font-size:17px;margin:4px 0 8px}h3{font-size:15px;margin:12px 0 6px}
+p,li{font-size:14px;line-height:1.5}
+.muted{color:var(--muted);font-size:13px}
+select,input[type=range]{width:100%}
+select{padding:8px;border-radius:8px;border:1px solid #cfd6e4;font-size:14px}
+.btn{background:var(--ind);color:#fff;border:0;padding:9px 14px;border-radius:9px;font-weight:600;cursor:pointer;font-size:14px;margin:6px 6px 0 0}
+.btn.alt{background:#fff;color:var(--ind);border:1px solid var(--ind)}
+.label{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;padding:4px 8px;border-radius:8px;margin-top:8px}
+#mri{width:100%;max-width:420px;aspect-ratio:1/1;border-radius:14px;background:#000;display:block;margin:0 auto}
+.row{display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-top:10px}
+.pill{display:inline-block;background:#EEF0FF;color:var(--ind);font-weight:700;padding:6px 12px;border-radius:20px;font-size:15px;margin:8px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:6px;border-bottom:1px solid #eef1f6;text-align:left}
+.bar{height:10px;background:var(--cyan);border-radius:5px}
+.seg{display:flex;gap:6px;margin-top:6px}.seg button{flex:1}
+footer{padding:16px 20px 30px;max-width:1200px;margin:0 auto}
+code{background:#eef1f6;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+<h1>MRI Digital Twin – Safety &amp; Contrast Lab <span style="opacity:.75;font-weight:500">v1.0</span></h1>
+<p>An interactive educational model of an MRI suite: safety zones, projectile risk and image contrast. For education only, not for clinical use.</p>
+</header>
+<nav>
+<button data-v="suite" class="on">1 · MRI suite &amp; safety zones</button>
+<button data-v="contrast">2 · Contrast lab (TR / TE)</button>
+<button data-v="about">About &amp; references</button>
+</nav>
+<main>
+
+<section id="suite" class="view on">
+<div class="grid">
+<div>
+<div id="scene"><div id="warn"></div></div>
+<p class="muted">Drag to rotate, scroll or pinch to zoom. The yellow dashed ring shows the 5-gauss (0.5 mT) line. Its real size depends on the magnet and its shielding; here it is illustrative.</p>
+</div>
+<div>
+<div class="card">
+<h2>ACR MR safety zones</h2>
+<div id="zones"></div>
+<div id="zinfo"><p class="muted">Choose a zone to highlight it and read what it means.</p></div>
+</div>
+<div class="card" style="margin-top:14px">
+<h2>Projectile test</h2>
+<p class="muted">Choose an object and bring it from Zone III into the scanner room (Zone IV).</p>
+<select id="obj"></select>
+<div><button class="btn" id="go">Bring into Zone IV</button><button class="btn alt" id="reset">Reset</button></div>
+<div id="oinfo"></div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="contrast" class="view">
+<div class="grid">
+<div class="card">
+<canvas id="mri" width="420" height="420"></canvas>
+<p class="muted" style="text-align:center">Simplified axial brain model: scalp fat, CSF, grey matter and white matter. Brightness is relative signal at the chosen settings.</p>
+</div>
+<div class="card">
+<h2>Spin-echo contrast</h2>
+<div class="seg">
+<button class="btn alt" data-b="1.5">1.5 T</button><button class="btn alt" data-b="3">3 T</button>
+</div>
+<div class="row"><span>TR (repetition time)</span><span id="trv"></span></div>
+<input type="range" id="tr" min="200" max="6000" step="50" value="500">
+<div class="row"><span>TE (echo time)</span><span id="tev"></span></div>
+<input type="range" id="te" min="5" max="200" step="1" value="15">
+<div class="seg" style="margin-top:10px">
+<button class="btn alt" data-p="t1">T1W preset</button><button class="btn alt" data-p="pd">PD preset</button><button class="btn alt" data-p="t2">T2W preset</button>
+</div>
+<div class="pill" id="wt"></div>
+<p id="wtx"></p>
+<table id="sig"></table>
+<h3>Signal equation used</h3>
+<p><code>S = PD × (1 − e<sup>−TR/T1</sup>) × e<sup>−TE/T2</sup></code></p>
+<p class="muted">Short TR increases T1 differences; long TE increases T2 differences. Real sequences (fast spin echo, inversion recovery, gradient echo) behave differently; this model is for learning the principle.</p>
+</div>
+</div>
+</section>
+
+<section id="about" class="view">
+<div class="card">
+<h2>About this project</h2>
+<p>Version 1.0 of an educational MRI simulator for radiography and medical students. It has two modules: an MRI suite showing the four ACR safety zones with a projectile demonstration, and a contrast lab showing how TR, TE and field strength change spin-echo image contrast.</p>
+<h3>Model values (approximate, for education)</h3>
+<table>
+<tr><th>Tissue</th><th>T1 / T2 at 1.5 T (ms)</th><th>T1 / T2 at 3 T (ms)</th><th>Relative PD</th></tr>
+<tr><td>White matter</td><td>≈680 / ≈70</td><td>832 / 80</td><td>0.69</td></tr>
+<tr><td>Grey matter</td><td>≈1150 / ≈90</td><td>1331 / 110</td><td>0.80</td></tr>
+<tr><td>CSF</td><td>≈4000 / ≈2000</td><td>≈4300 / ≈2000</td><td>1.00</td></tr>
+<tr><td>Fat</td><td>≈260 / ≈85</td><td>371 / 133</td><td>0.90</td></tr>
+</table>
+<p class="muted">Brain at 3 T: in vivo values from Wansapura JP et al., J Magn Reson Imaging 1999;9(4):531–538. Brain at 1.5 T: rounded mid-range of published in vivo values. Fat at 3 T as tabulated in Radiat Oncol 2013;8:51. CSF, fat at 1.5 T and all proton densities are rounded textbook approximations. Published values vary with measurement method, region and age.</p>
+<h3>Safety content</h3>
+<p>Zone definitions follow the American College of Radiology (ACR) Manual on MR Safety. Object labels follow the MR Safe, MR Conditional and MR Unsafe terms of ASTM F2503. Objects in the projectile test are examples; always check the actual item's labelling and your site's MR safety policy.</p>
+<h3>Disclaimer</h3>
+<p>This simulator is for education only. It is not a medical device, does not model any specific scanner, and must not be used for clinical decisions, patient screening or site planning.</p>
+<h3>References</h3>
+<ol>
+<li>American College of Radiology. ACR Manual on MR Safety. 2024.</li>
+<li>Wansapura JP, Holland SK, Dunn RS, Ball WS Jr. NMR relaxation times in the human brain at 3.0 tesla. J Magn Reson Imaging. 1999;9(4):531–538.</li>
+<li>ASTM F2503. Standard Practice for Marking Medical Devices and Other Items for Safety in the Magnetic Resonance Environment.</li>
+<li>MRI-based treatment plan simulation and adaptation for ion radiotherapy using a classification-based approach. Radiat Oncol. 2013;8:51 (Table 1).</li>
+</ol>
+<p class="muted">Author: Bahjat Jabatah, MPH – MRI/CT Technologist &amp; Health Researcher.</p>
+</div>
+</section>
+</main>
+<footer class="muted">MRI Digital Twin v1.0 · Educational use only · © 2026 Bahjat Jabatah</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ---------- tabs ----------
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===b.dataset.v));
+  if(b.dataset.v==='suite') resize();
+});
+
+// ---------- zones data ----------
+const ZONES=[
+ {id:1,name:'Zone I',col:'#06D6A0',x0:-14,x1:-9,title:'Zone I – public area',
+  text:'All areas freely accessible to the general public, outside the MR environment. Patients, staff and visitors pass through here to reach the MR site (ACR).'},
+ {id:2,name:'Zone II',col:'#FFD166',x0:-9,x1:-4,title:'Zone II – screening and reception',
+  text:'The interface between public Zone I and the strictly controlled Zones III and IV. Patients are greeted here and supervised by MR personnel, and MR safety screening questions and histories are usually taken here (ACR).'},
+ {id:3,name:'Zone III',col:'#F78C6B',x0:-4,x1:0,title:'Zone III – restricted (control room)',
+  text:'Access is strictly restricted and controlled by MR personnel. Free movement of unscreened people or ferromagnetic objects here can lead to serious injury. The control room is usually in Zone III.'},
+ {id:4,name:'Zone IV',col:'#EF476F',x0:0,x1:9,title:'Zone IV – MR scanner room',
+  text:'The room that houses the magnet. The static field is always on, even when no scan is running. Only screened patients and MR personnel, with MR Safe or MR Conditional equipment used within its conditions, may enter.'}
+];
+const OBJECTS=[
+ {k:'o2steel',name:'Steel oxygen cylinder',cls:'unsafe',ferro:true,color:0x7a7f8c,shape:'cyl'},
+ {k:'scissors',name:'Steel scissors',cls:'unsafe',ferro:true,color:0x9aa3b2,shape:'small'},
+ {k:'chair',name:'Standard steel wheelchair',cls:'unsafe',ferro:true,color:0x555a66,shape:'box'},
+ {k:'o2alu',name:'MR Safe-labelled aluminium oxygen cylinder',cls:'safe',ferro:false,color:0xc9ced8,shape:'cyl'},
+ {k:'pump',name:'MR Conditional infusion pump',cls:'cond',ferro:false,color:0xf2f4f8,shape:'box'}
+];
+const CLS={
+ safe:{lab:'MR Safe',bg:'#E5F4E4',fg:'#1f7a3a',txt:'Poses no known hazard in any MR environment. It stays where it is placed.'},
+ cond:{lab:'MR Conditional',bg:'#FFF4D6',fg:'#8a6200',txt:'Safe only under the specific conditions on its label (for example field strength, spatial field gradient and position). Here it is used within its conditions, so it does not move. Outside them it may be dangerous.'},
+ unsafe:{lab:'MR Unsafe',bg:'#FBEBEB',fg:'#b3261e',txt:'Ferromagnetic: the magnet pulls it towards the bore with increasing force as it gets closer. A projectile like this can cause serious injury or death and damage the scanner.'}
+};
+
+// ---------- three.js scene ----------
+const box=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+box.appendChild(renderer.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xdfe6f2);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,200);
+camera.position.set(-3,13.5,14.5);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(-2.5,0,0.5); controls.enableDamping=true; controls.maxPolarAngle=Math.PI/2.1;
+scene.add(new THREE.HemisphereLight(0xffffff,0x8899aa,0.9));
+const dl=new THREE.DirectionalLight(0xffffff,0.7); dl.position.set(6,14,8); scene.add(dl);
+
+const D=7; // depth of rooms
+const zoneMeshes={};
+ZONES.forEach(z=>{
+  const w=z.x1-z.x0;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,D),new THREE.MeshLambertMaterial({color:z.col}));
+  m.position.set(z.x0+w/2,-0.1,0); scene.add(m); zoneMeshes[z.id]=m;
+  const sp=makeLabel(z.name,z.col); sp.position.set(z.x0+w/2,0.25,D/2-0.6); scene.add(sp);
+});
+function makeLabel(text,col){
+  const c=document.createElement('canvas'); c.width=256; c.height=96; const g=c.getContext('2d');
+  g.fillStyle='rgba(255,255,255,.92)'; roundRect(g,4,8,248,80,18); g.fill();
+  g.fillStyle='#1B1F3B'; g.font='bold 44px system-ui,Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,128,50);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  s.scale.set(2.6,1,1); s.center.set(0.5,0); return s;
+}
+function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+// walls between zones (with door gaps)
+const wallMat=new THREE.MeshLambertMaterial({color:0xf4f6fa,transparent:true,opacity:0.85});
+[-9,-4,0].forEach(x=>{
+  const a=new THREE.Mesh(new THREE.BoxGeometry(0.15,1.6,D/2-1),wallMat); a.position.set(x,0.8,-(D/4+0.5)); scene.add(a);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(0.15,1.6,D/2-1),wallMat); b.position.set(x,0.8,(D/4+0.5)); scene.add(b);
+});
+// back wall
+const bw=new THREE.Mesh(new THREE.BoxGeometry(23,1.6,0.15),wallMat); bw.position.set(-2.5,0.8,-D/2); scene.add(bw);
+// magnet
+const MX=4.5;
+const magnet=new THREE.Group();
+const housing=new THREE.Mesh(new THREE.BoxGeometry(2.4,3.2,3.4),new THREE.MeshLambertMaterial({color:0xfafbff}));
+housing.position.y=1.6; magnet.add(housing);
+const bore=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,2.5,40,1,true),new THREE.MeshLambertMaterial({color:0x2a3550,side:THREE.DoubleSide}));
+bore.rotation.z=Math.PI/2; bore.position.y=1.6; magnet.add(bore);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(0.95,0.12,16,48),new THREE.MeshLambertMaterial({color:0x4361EE}));
+ring.rotation.y=Math.PI/2; ring.position.set(-1.22,1.6,0); magnet.add(ring);
+magnet.position.set(MX,0,0); scene.add(magnet);
+// table
+const table=new THREE.Mesh(new THREE.BoxGeometry(3,0.25,0.9),new THREE.MeshLambertMaterial({color:0xd7dce6}));
+table.position.set(MX-2.6,1.0,0); scene.add(table);
+const leg=new THREE.Mesh(new THREE.BoxGeometry(1.6,1,0.7),new THREE.MeshLambertMaterial({color:0xc4cad6}));
+leg.position.set(MX-2.6,0.45,0); scene.add(leg);
+// 5 gauss line (illustrative ellipse)
+const pts=[]; for(let i=0;i<=128;i++){const t=i/128*Math.PI*2; pts.push(new THREE.Vector3(MX+3.6*Math.cos(t),0.04,2.6*Math.sin(t)));}
+for(let i=0;i<64;i+=2){const a=pts[i*2],b=pts[i*2+2]; const seg=new THREE.Mesh(new THREE.BoxGeometry(a.distanceTo(b),0.06,0.12),new THREE.MeshBasicMaterial({color:0xFFD166})); seg.position.copy(a.clone().add(b).multiplyScalar(0.5)); seg.position.y=0.06; seg.lookAt(b.x,0.06,b.z); seg.rotateY(Math.PI/2); scene.add(seg);}
+const g5=makeLabel('5 G',''); g5.scale.set(1.4,0.55,1); g5.position.set(MX+3.6,0.1,0); scene.add(g5);
+// console in control room
+const desk=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.9,2.4),new THREE.MeshLambertMaterial({color:0xb8c0cf}));
+desk.position.set(-2,0.45,-1.6); scene.add(desk);
+// chairs in waiting room
+for(let i=0;i<3;i++){const c=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.6,0.7),new THREE.MeshLambertMaterial({color:0x7fb8a8})); c.position.set(-12.5,0.3,-2+i*1.2); scene.add(c);}
+
+// object
+let objMesh=null, anim=null, curObj=OBJECTS[0];
+function buildObj(o){
+  if(objMesh) scene.remove(objMesh);
+  let geo; if(o.shape==='cyl') geo=new THREE.CylinderGeometry(0.28,0.28,1.3,24);
+  else if(o.shape==='small') geo=new THREE.BoxGeometry(0.5,0.12,0.18);
+  else geo=new THREE.BoxGeometry(0.8,0.9,0.6);
+  objMesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:o.color}));
+  objMesh.userData.h=o.shape==='cyl'?0.65:(o.shape==='small'?0.9:0.45);
+  objMesh.position.set(-1.6,objMesh.userData.h,1.6); objMesh.rotation.set(0,0,0); scene.add(objMesh);
+}
+const sel=document.getElementById('obj');
+OBJECTS.forEach(o=>{const op=document.createElement('option'); op.value=o.k; op.textContent=o.name; sel.appendChild(op);});
+sel.onchange=()=>{curObj=OBJECTS.find(o=>o.k===sel.value); reset();};
+function showClass(o,done){
+  const c=CLS[o.cls];
+  document.getElementById('oinfo').innerHTML=`<span class="label" style="background:${c.bg};color:${c.fg}">${c.lab}</span><p>${done?c.txt:'Ready. This item is in Zone III.'}</p>`;
+}
+function reset(){anim=null; document.getElementById('warn').style.display='none'; buildObj(curObj); showClass(curObj,false);}
+document.getElementById('reset').onclick=reset;
+document.getElementById('go').onclick=()=>{ if(!objMesh) return; reset(); anim={t:0,phase:'walk',v:0}; };
+
+function step(dt){
+  if(!anim) return;
+  const p=objMesh.position;
+  if(anim.phase==='walk'){
+    p.x+=dt*1.8; p.z-=dt*0.55; if(p.z<0.6) p.z=0.6;
+    if(p.x>=1.0){ anim.phase=curObj.ferro?'pull':'stop'; if(!curObj.ferro){showClass(curObj,true); anim=null;} }
+  } else if(anim.phase==='pull'){
+    const target=new THREE.Vector3(MX-1.25,1.6,0);
+    const d=target.clone().sub(p); const dist=d.length();
+    anim.v+=dt*(14/Math.max(dist*dist,0.25));  // force grows sharply closer to the magnet
+    d.normalize().multiplyScalar(Math.min(anim.v*dt,dist)); p.add(d);
+    objMesh.rotation.x+=dt*6; objMesh.rotation.z+=dt*4;
+    if(dist<0.15){ anim=null; const w=document.getElementById('warn'); w.textContent='PROJECTILE! The ferromagnetic object was pulled into the bore.'; w.style.display='block'; showClass(curObj,true); }
+  }
+}
+
+// zone buttons
+const zb=document.getElementById('zones');
+ZONES.forEach(z=>{
+  const b=document.createElement('button'); b.className='zbtn';
+  b.innerHTML=`<span class="sw" style="background:${z.col}"></span><b>${z.name}</b>`;
+  b.onclick=()=>{
+    document.querySelectorAll('.zbtn').forEach(x=>x.classList.toggle('on',x===b));
+    ZONES.forEach(o=>{const m=zoneMeshes[o.id]; m.material.opacity=o.id===z.id?1:0.35; m.material.transparent=true; m.position.y=o.id===z.id?0:-0.1;});
+    document.getElementById('zinfo').innerHTML=`<h3>${z.title}</h3><p>${z.text}</p>`;
+  };
+  zb.appendChild(b);
+});
+
+function resize(){const w=box.clientWidth,h=box.clientHeight; if(!w) return; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);
+let last=performance.now();
+function loop(now){const dt=Math.min((now-last)/1000,0.05); last=now; step(dt); controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);}
+resize(); reset(); requestAnimationFrame(loop);
+
+// ---------- contrast lab ----------
+const TIS={
+ '1.5':{wm:[680,70],gm:[1150,90],csf:[4000,2000],fat:[260,85]},
+ '3':{wm:[832,80],gm:[1331,110],csf:[4300,2000],fat:[371,133]}
+};
+const PD={wm:0.69,gm:0.80,csf:1.0,fat:0.90};
+const NAMES={wm:'White matter',gm:'Grey matter',csf:'CSF',fat:'Fat'};
+let B0='1.5';
+const tr=document.getElementById('tr'), te=document.getElementById('te');
+function signal(k){const [T1,T2]=TIS[B0][k]; return PD[k]*(1-Math.exp(-tr.value/T1))*Math.exp(-te.value/T2);}
+function weighting(TR,TE){
+  if(TR<=800 && TE<=30) return ['T1-weighted','Short TR and short TE: tissues with short T1 (fat, white matter) are bright, CSF is dark.'];
+  if(TR>=2000 && TE>=80) return ['T2-weighted','Long TR and long TE: tissues with long T2 (CSF) are bright, fat is less bright on conventional spin echo.'];
+  if(TR>=2000 && TE<=30) return ['Proton-density weighted','Long TR and short TE: contrast mainly reflects how many protons each tissue has.'];
+  if(TR<=800 && TE>=80) return ['Poor combination','Short TR and long TE: low signal from every tissue and little useful contrast.'];
+  return ['Mixed weighting','Intermediate settings: contrast mixes T1, T2 and proton-density effects.'];
+}
+const cv=document.getElementById('mri'), g=cv.getContext('2d');
+function ell(cx,cy,rx,ry,col){g.fillStyle=col; g.beginPath(); g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); g.fill();}
+function shade(v){const c=Math.round(255*v); return `rgb(${c},${c},${c})`;}
+function draw(){
+  document.getElementById('trv').textContent=tr.value+' ms';
+  document.getElementById('tev').textContent=te.value+' ms';
+  const s={}; let mx=0; for(const k in PD){s[k]=signal(k); mx=Math.max(mx,s[k]);}
+  const n={}; for(const k in s) n[k]=mx>0?s[k]/mx:0;
+  g.fillStyle='#000'; g.fillRect(0,0,420,420);
+  ell(210,210,175,195,shade(n.fat));      // scalp fat
+  ell(210,210,158,178,'#111');             // skull (no signal)
+  ell(210,210,148,168,shade(n.csf));       // subarachnoid CSF
+  ell(210,210,140,160,shade(n.gm));        // cortex
+  ell(210,212,112,130,shade(n.wm));        // white matter
+  g.save(); g.translate(192,200); g.rotate(-0.18); ell(0,0,11,46,shade(n.csf)); g.restore();   // left lateral ventricle
+  g.save(); g.translate(228,200); g.rotate(0.18); ell(0,0,11,46,shade(n.csf)); g.restore();    // right lateral ventricle
+  ell(160,232,16,24,shade(n.gm)); ell(260,232,16,24,shade(n.gm)); // deep grey matter (basal ganglia, simplified)
+  g.fillStyle='rgba(255,255,255,.75)'; g.font='bold 15px system-ui'; g.fillText(B0+' T  ·  TR '+tr.value+'  ·  TE '+te.value,14,24);
+  const [w,t]=weighting(+tr.value,+te.value);
+  document.getElementById('wt').textContent=w; document.getElementById('wtx').textContent=t;
+  let h='<tr><th>Tissue</th><th>T1 / T2 (ms)</th><th>Relative signal</th></tr>';
+  for(const k of ['fat','wm','gm','csf']){const [a,b]=TIS[B0][k]; h+=`<tr><td>${NAMES[k]}</td><td>${a} / ${b}</td><td><div class="bar" style="width:${Math.round(n[k]*100)}%"></div></td></tr>`;}
+  document.getElementById('sig').innerHTML=h;
+  document.querySelectorAll('[data-b]').forEach(b=>{b.classList.toggle('alt',b.dataset.b!==B0);});
+}
+tr.oninput=draw; te.oninput=draw;
+document.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{B0=b.dataset.b; draw();});
+const PRE={t1:[500,15],pd:[3000,15],t2:[4000,100]};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{tr.value=PRE[b.dataset.p][0]; te.value=PRE[b.dataset.p][1]; draw();});
+draw();
+</script>
+</body>
+</html>
