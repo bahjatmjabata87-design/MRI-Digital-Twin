@@ -119,7 +119,7 @@ code{background:#eef1f6;padding:1px 5px;border-radius:4px}
 <div class="grid">
 <div class="card">
 <h2><span class="step">1</span>Position the patient</h2>
-<canvas id="posc" width="720" height="300"></canvas>
+<canvas id="posc" width="760" height="300"></canvas>
 <p id="posmsg" class="muted"></p>
 </div>
 <div class="card frm">
@@ -129,7 +129,7 @@ code{background:#eef1f6;padding:1px 5px;border-radius:4px}
 <label>Receive coil<select id="ps-coil"><option value="head">Head coil</option><option value="body">Body coil only</option></select></label>
 <div class="cb"><input type="checkbox" id="ps-pads" style="width:18px;height:18px"> Foam pads around the head</div>
 <div class="cb"><input type="checkbox" id="ps-ears" style="width:18px;height:18px"> Hearing protection</div>
-<label>Laser landmark (sets the isocentre)<select id="ps-land"><option value="nasion">Nasion</option><option value="vertex">Vertex (top of the head)</option><option value="chin">Chin</option><option value="sternal">Sternal notch</option></select></label>
+<label>Laser landmark (sets the isocentre)<select id="ps-land"><option value="glabella">Glabella (between the eyebrows)</option><option value="nasion">Nasion (root of the nose)</option><option value="vertex">Vertex (top of the head)</option><option value="chin">Chin</option><option value="sternal">Sternal notch</option></select></label>
 <div><button class="btn" id="movebtn">Move to isocentre &amp; run localizer</button><button class="btn alt" id="newpt">New patient</button></div>
 </div>
 </div>
@@ -221,11 +221,11 @@ code{background:#eef1f6;padding:1px 5px;border-radius:4px}
 <p class="muted">Brain at 3 T: in vivo values from Wansapura JP et al., J Magn Reson Imaging 1999;9(4):531–538. Brain at 1.5 T: rounded mid-range of published in vivo values. CSF values and all proton densities are rounded textbook approximations. Published values vary with measurement method, region and age.</p>
 <h3>Positioning and planning lab (model notes)</h3>
 <ul>
-<li>Positioning: head first, supine, head coil with foam pads, hearing protection, laser landmark on the nasion. Axial brain slices are planned parallel to the AC–PC line and cover the vertex to the foramen magnum; coronal slices are perpendicular to the AC–PC line; sagittal slices are parallel to the midline (falx).</li>
-<li>Head anatomy: the 3D grey matter, white matter and CSF maps of the MNI ICBM152 2009a template at 2 mm. The skull (no signal) and a scalp fat layer are simple illustrative shells, not real anatomy. AC and PC markers were located approximately on the template (AC ≈ 0, 2, −4 mm; PC ≈ 0, −28, −2 mm). Each new patient has a random head tilt.</li>
+<li>Positioning: head first, supine, head coil with foam pads, hearing protection, laser landmark on the glabella (between the eyebrows) or the nasion, depending on local protocol. Axial brain slices are planned parallel to the AC–PC line and cover the vertex to the foramen magnum; coronal slices are perpendicular to the AC–PC line; sagittal slices are parallel to the midline (falx).</li>
+<li>Head anatomy: the 3D grey matter, white matter and CSF maps of the MNI ICBM152 2009a template at 2 mm. The skull, scalp, face, eyes, neck and spinal cord are simplified illustrative shapes added around the template brain, not real anatomy; the face outline was drawn to adult proportions so that the glabella, nasion, chin and vertex landmarks sit in realistic positions. AC and PC markers were located approximately on the template (AC ≈ 0, 2, −4 mm; PC ≈ 0, −28, −2 mm). Each new patient has a random head tilt.</li>
 <li>Scan time = TR × phase-encoding steps × NEX ÷ echo train length (× number of acquisitions if all slices do not fit in one TR). Relative SNR ∝ voxel volume × √(phase steps × NEX). Pixel size = FOV ÷ matrix.</li>
 <li>Scalp fat: T1/T2 382/68 ms at 3 T (de Bazelaire et al. 2004); 1.5 T values approximate. Fat is kept bright on fast spin echo to mimic the J-coupling effect.</li>
-<li>Artefacts shown: wrap-around (aliasing) along the phase-encoding direction when the FOV is too small, motion ghosts without immobilisation, and signal fall-off far from the isocentre. All are simplified.</li>
+<li>Artefacts shown (and labelled on the image): wrap-around (aliasing) along the phase-encoding direction when the FOV is too small, faint motion ghosts without foam pads, low SNR with the body coil, and signal fall-off far from the isocentre. All are simplified.</li><li>Soft tissue (muscle) T1/T2: approximately 1000/40 ms at 1.5 T and 1420/32 ms at 3 T; vitreous of the eye treated like fluid.</li>
 </ul>
 <h3>Brain images</h3>
 <p>The contrast lab uses the grey and white matter maps of the MNI ICBM152 2009a nonlinear symmetric template, as distributed with the open-source nilearn library. CSF is estimated as the brain volume not classed as grey or white matter. Template copyright (C) 1993–2009 Louis Collins, McConnell Brain Imaging Centre, Montreal Neurological Institute, McGill University; used under its permissive licence with this notice. The images are an average of many scans, not a single patient.</p>

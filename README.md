@@ -4,7 +4,7 @@ An interactive educational simulator for radiography and medical students. It ru
 
 **Live demo:** https://bahjatmjabata87-design.github.io/MRI-Digital-Twin/
 
-An 80-second video tour (`demo.mp4`) plays at the top of the page. The planning tab shows its own 100-second tour (`planning-tour.mp4`).
+An 80-second video tour (`demo.mp4`) plays at the top of the page. The planning tab shows its own 103-second tour (`planning-tour.mp4`).
 
 ## Modules
 
@@ -14,7 +14,7 @@ An 80-second video tour (`demo.mp4`) plays at the top of the page. The planning 
    - A brain MRI image is computed live from real brain anatomy: the grey matter, white matter and CSF maps of the MNI ICBM152 2009a template, across four axial slices.
    - Uses the basic spin-echo signal equation: `S = PD × (1 − e^(−TR/T1)) × e^(−TE/T2)`.
 2. **Positioning and planning (brain) – new in v1.1**
-   - Position a virtual patient: head first or feet first, supine or prone, head coil or body coil, foam pads, hearing protection, and the laser landmark. Move the table to the isocentre to acquire three-plane localizers.
+   - Position a virtual patient: head first or feet first, supine or prone, head coil or body coil, foam pads, hearing protection, and the laser landmark (glabella, nasion, vertex, chin or sternal notch). The side view is drawn from the same 3D head, so the laser lands on the chosen landmark. Move the table to the isocentre to acquire three-plane localizers.
    - Plan axial, coronal or sagittal slices on the sagittal, coronal and axial localizers: drag to move the slice block and drag the handle to angle it (AC–PC line guide available). Each new patient has a random head tilt to correct.
    - Set TR, TE, echo train length, NEX, number of slices, thickness, gap, FOV, matrix and phase-encoding direction, at 1.5 T or 3 T. Coverage, voxel size, relative SNR, slices per TR and scan time update live.
    - Scan and scroll through the resulting slices, resliced live from a 3D brain volume. See partial volume, pixelation, noise, wrap-around and motion ghosts.
@@ -26,7 +26,7 @@ An 80-second video tour (`demo.mp4`) plays at the top of the page. The planning 
 
 ## Built with
 
-- HTML, CSS and JavaScript (`index.html`, `planning.js`); 3D head data in `brain3d.js` (4-bit grey matter, white matter, CSF and scalp maps on a 2 mm grid)
+- HTML, CSS and JavaScript (`index.html`, `planning.js`); 3D head data in `brain3d.js` (4-bit grey matter, white matter, CSF, fat, soft tissue and eye maps on a 2 mm grid)
 - [three.js](https://threejs.org/) r128 for the 3D scene
 
 ## Scientific basis
@@ -39,7 +39,7 @@ An 80-second video tour (`demo.mp4`) plays at the top of the page. The planning 
 - Scalp fat at 3 T: de Bazelaire CMJ et al. Radiology. 2004;230(3):652–659.
 - Other values (1.5 T brain, CSF, proton densities) are rounded approximations of published values. Values vary with measurement method, region and age.
 
-The skull and scalp in the planning lab are simple illustrative shells. The images are an average of many adult scans, not a single patient.
+The skull, scalp, face, eyes, neck and spinal cord in the planning lab are simplified illustrative shapes around the template brain. The images are an average of many adult scans, not a single patient.
 
 ## Disclaimer
 

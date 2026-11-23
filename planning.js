@@ -2,16 +2,19 @@
 // Educational model only. Head anatomy: MNI ICBM152 2009a GM/WM maps (CSF and scalp derived), 2 mm grid.
 (function(){
 'use strict';
-const VOL={nx:87,ny:105,nz:86,vox:2,origin:[-85.5,-121.5,-73.5]};
+const VOL={nx:86,ny:125,nz:145,vox:2,origin:[-85.5,-125.5,-185.5]};
+const NC=6; // channels: gm, wm, csf, fat (skin/scalp/orbit), soft tissue (muscle), eye (vitreous)
+const PROF=[[-183,16,-75],[-177,16,-74],[-171,17,-74],[-165,17,-73],[-159,18,-74],[-153,25,-74],[-147,88,-75],[-141,93,-76],[-135,92,-77],[-129,88,-78],[-123,91,-79],[-117,95,-80],[-111,94,-81],[-105,96,-83],[-99,97,-84],[-93,95,-86],[-87,94,-89],[-81,104,-91],[-75,110,-94],[-69,113,-96],[-63,108,-98],[-57,103,-100],[-51,97,-102],[-45,91,-104],[-39,87,-106],[-33,86,-108],[-27,89,-110],[-21,91,-112],[-15,92,-113],[-9,92,-114],[-3,91,-115],[3,90,-116],[9,90,-117],[15,81,-114],[21,79,-112],[27,77,-109],[33,75,-106],[39,72,-103],[45,68,-99],[51,64,-93],[57,58,-90],[63,51,-87],[69,42,-81],[75,31,-74],[81,18,-64],[87,-7,-50],[90,-19,-43]]; // mid-sagittal head outline [z, anterior y, posterior y] (mm)
 const NV=VOL.nx*VOL.ny*VOL.nz;
-let D=null; // Float32Array, 4 channels interleaved (gm,wm,csf,fat), 0..1
+let D=null; // Float32Array, NC channels interleaved, 0..1
 const $=id=>document.getElementById(id);
 
 // ---------- tissue model ----------
 // Brain: same values as the contrast lab. Fat (scalp): 3 T de Bazelaire et al. Radiology 2004 (382/68 ms); 1.5 T approximate.
-const TT={'1.5':{gm:[1150,90],wm:[680,70],csf:[4000,2000],fat:[340,75]},
-          '3':{gm:[1331,110],wm:[832,80],csf:[4300,2000],fat:[382,68]}};
-const TPD={gm:0.80,wm:0.69,csf:1.0,fat:0.90};
+const TT={'1.5':{gm:[1150,90],wm:[680,70],csf:[4000,2000],fat:[340,75],mus:[1000,40],eye:[4000,1500]},
+          '3':{gm:[1331,110],wm:[832,80],csf:[4300,2000],fat:[382,68],mus:[1420,32],eye:[4300,1500]}};
+const TPD={gm:0.80,wm:0.69,csf:1.0,fat:0.90,mus:0.70,eye:1.0};
+const TK=['gm','wm','csf','fat','mus','eye'];
 // approximate landmarks located on the template (mm, MNI space)
 const AC=[0,2,-4], PC=[0,-28,-2];
 const BRAIN_LOW=-62; // approximate foramen magnum level on the template (bottom of cerebellum)
@@ -32,16 +35,16 @@ const I3=()=>[[1,0,0],[0,1,0],[0,0,1]];
 const deg=r=>r*180/Math.PI, rad=d=>d*Math.PI/180;
 
 // ---------- volume sampling (head coordinates, mm) ----------
-const S4=new Float32Array(4);
+const S4=new Float32Array(NC);
 function sampleHead(q){
   const fx=(q[0]-VOL.origin[0])/2, fy=(q[1]-VOL.origin[1])/2, fz=(q[2]-VOL.origin[2])/2;
-  S4[0]=S4[1]=S4[2]=S4[3]=0;
+  S4.fill(0);
   if(fx<0||fy<0||fz<0||fx>=VOL.nx-1||fy>=VOL.ny-1||fz>=VOL.nz-1) return S4;
   const x=fx|0,y=fy|0,z=fz|0,ax=fx-x,ay=fy-y,az=fz-z;
-  const sx=4,sy=4*VOL.nx,sz=4*VOL.nx*VOL.ny, b=x*sx+y*sy+z*sz;
+  const sx=NC,sy=NC*VOL.nx,sz=NC*VOL.nx*VOL.ny, b=x*sx+y*sy+z*sz;
   const w000=(1-ax)*(1-ay)*(1-az),w100=ax*(1-ay)*(1-az),w010=(1-ax)*ay*(1-az),w110=ax*ay*(1-az),
         w001=(1-ax)*(1-ay)*az,w101=ax*(1-ay)*az,w011=(1-ax)*ay*az,w111=ax*ay*az;
-  for(let c=0;c<4;c++){
+  for(let c=0;c<NC;c++){
     S4[c]=D[b+c]*w000+D[b+sx+c]*w100+D[b+sy+c]*w010+D[b+sx+sy+c]*w110+
           D[b+sz+c]*w001+D[b+sx+sz+c]*w101+D[b+sy+sz+c]*w011+D[b+sx+sy+sz+c]*w111;
   }
@@ -50,16 +53,16 @@ function sampleHead(q){
 
 // ---------- state ----------
 const ST={
-  pos:{dir:'hf',pose:'supine',coil:'head',pads:true,ears:true,land:'nasion'},
+  pos:{dir:'hf',pose:'supine',coil:'head',pads:true,ears:true,land:'glabella'},
   moved:false, tilt:I3(), tiltInfo:[0,0],
-  L:[0,-15,-30],      // head point placed at isocentre (from laser landmark)
+  L:[0,-2,-18],      // head point placed at isocentre (from laser landmark)
   B0:'1.5',
   task:'ax',
   blk:{type:'ax',R:I3(),c:[0,0,0]},
   p:{TR:4000,TE:100,ETL:16,NEX:1,N:20,thk:5,gap:1,FOV:230,Nf:256,Np:224,phase:1},
   locOff:{sag:1,cor:1,ax:1}, cur:0, scanned:false
 };
-const LAND={nasion:{z:-30,t:'Nasion'},vertex:{z:94,t:'Vertex (top of the head)'},chin:{z:-110,t:'Chin (mental point)'},sternal:{z:-230,t:'Sternal notch'}};
+const LAND={glabella:{z:-18,t:'Glabella'},nasion:{z:-35,t:'Nasion'},vertex:{z:90,t:'Vertex'},chin:{z:-154,t:'Chin'},sternal:{z:-215,t:'Sternal notch'}};
 const TASKS={
   ax:{t:'Routine axial brain (T2 FSE, AC–PC line)',type:'ax',seq:'t2'},
   cor:{t:'Coronal brain (T2 FSE, perpendicular to AC–PC)',type:'cor',seq:'t2'},
@@ -81,8 +84,8 @@ const toScan=q=>mv(ST.tilt,sub(q,ST.L));            // head -> scanner
 // ---------- signal ----------
 function tissueSignals(){
   const T=TT[ST.B0],p=ST.p,o={};
-  for(const k of ['gm','wm','csf','fat']){
-    let [T1,T2]=T[k]; if(k==='fat'&&p.ETL>1) T2*=2.5; // J-coupling: fat stays bright on fast spin echo
+  for(const k of TK){
+    let [T1,T2]=T[k]; if(k==='fat'&&p.ETL>1) T2*=1.6; // J-coupling: fat stays bright on fast spin echo
     o[k]=TPD[k]*(1-Math.exp(-p.TR/T1))*Math.exp(-p.TE/T2);
   }
   return o;
@@ -125,7 +128,7 @@ function renderLocalizer(k){
     const p=[o[0]+a*v.u[0]+b*v.w[0],o[1]+a*v.u[1]+b*v.w[1],o[2]+a*v.u[2]+b*v.w[2]];
     const t=sampleHead(toHead(p));
     // fast gradient-echo style localizer contrast
-    let val=(t[0]*0.55+t[1]*0.8+t[2]*0.18+t[3]*0.95)*250+Math.random()*8;
+    let val=(t[0]*0.55+t[1]*0.8+t[2]*0.18+t[3]*0.95+t[4]*0.38+t[5]*0.12)*250+Math.random()*8;
     if(ST.pos.coil!=='head') val*=0.75;
     const c=Math.max(0,Math.min(255,val)),q=(j*LPX+i)*4;
     img.data[q]=img.data[q+1]=img.data[q+2]=c; img.data[q+3]=255;
@@ -233,7 +236,7 @@ function renderResult(){
     for(const w of [-1,0,1]){ // aliasing: tissue one FOV away along the phase direction folds in
       const base=add(ck,add(add(mul(f.e1,a),mul(f.e2,b)),mul(wrapDir,w*F)));
       for(const o of offs){const ps=add(base,mul(f.n,o));const t=sampleHead(toHead(ps));
-        let s=t[0]*sig.gm+t[1]*sig.wm+t[2]*sig.csf+t[3]*sig.fat;
+        let s=t[0]*sig.gm+t[1]*sig.wm+t[2]*sig.csf+t[3]*sig.fat+t[4]*sig.mus+t[5]*sig.eye;
         const r=Math.hypot(...ps); s*=Math.exp(-Math.pow(r/210,6)); // field homogeneity / coil falloff far from isocentre
         v+=s/3;}
     }
@@ -241,9 +244,9 @@ function renderResult(){
   }
   let out=raw;
   if(!ST.pos.pads){ // head motion -> ghosts along the phase-encoding direction
-    out=new Float32Array(raw.length);const sh=Math.round((phaseIsE1?nx:ny)/5);
+    out=new Float32Array(raw.length);const sh=Math.round((phaseIsE1?nx:ny)/6);
     for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){let v=raw[j*nx+i];
-      for(const s of [-sh,sh]){if(phaseIsE1){const ii=(i+s+nx)%nx;v+=0.28*raw[j*nx+ii];}else{const jj=(j+s+ny)%ny;v+=0.28*raw[jj*nx+i];}}
+      for(const s of [-sh,sh]){if(phaseIsE1){const ii=(i+s+nx)%nx;v+=0.10*raw[j*nx+ii];}else{const jj=(j+s+ny)%ny;v+=0.10*raw[jj*nx+i];}}
       out[j*nx+i]=v;}
   }
   const off=document.createElement('canvas');off.width=nx;off.height=ny;const og=off.getContext('2d'),img=og.createImageData(nx,ny);
@@ -257,6 +260,8 @@ function renderResult(){
   g.font='11px system-ui';
   txt(g,SEQLAB()+' · '+ST.B0+' T · TR '+p.TR+' · TE '+p.TE,8,30);
   txt(g,'Slice '+(ST.cur+1)+' / '+p.N+' · '+p.thk+' mm · matrix '+p.Nf+'×'+p.Np,8,RPX-22);
+  const notes=[];if(!ST.pos.pads)notes.push('Motion ghosts: no foam pads');if(wrapCount()>=3)notes.push('Wrap-around: FOV too small');if(ST.pos.coil!=='head')notes.push('Low SNR: body coil');
+  g.fillStyle='#FFD166';g.font='bold 11px system-ui';notes.forEach((t,i)=>txt(g,'⚠ '+t,8,48+i*15));
 }
 function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
 const SEQLAB=()=>ST.p.ETL>1?'FSE (ETL '+ST.p.ETL+')':'SE';
@@ -266,9 +271,9 @@ let BRAINPTS=null, SCALPPTS=null;
 function buildPoints(){
   BRAINPTS=[];SCALPPTS=[];
   for(let z=0;z<VOL.nz;z+=2)for(let y=0;y<VOL.ny;y+=2)for(let x=0;x<VOL.nx;x+=2){
-    const b=4*(x+VOL.nx*(y+VOL.ny*z)),q=[VOL.origin[0]+2*x,VOL.origin[1]+2*y,VOL.origin[2]+2*z];
+    const b=NC*(x+VOL.nx*(y+VOL.ny*z)),q=[VOL.origin[0]+2*x,VOL.origin[1]+2*y,VOL.origin[2]+2*z];
     if(D[b]+D[b+1]>0.5&&q[2]>=BRAIN_LOW) BRAINPTS.push(q);
-    if(D[b+3]>0.5) SCALPPTS.push(q);
+    if(D[b+3]+D[b+4]+D[b+5]>0.5&&!(D[b]+D[b+1]+D[b+2]>0.3)) SCALPPTS.push(q);
   }
 }
 function inBlock(p,f,half,F){const d=sub(p,ST.blk.c);return Math.abs(dot(d,f.n))<=half&&Math.abs(dot(d,f.e1))<=F&&Math.abs(dot(d,f.e2))<=F;}
@@ -284,6 +289,11 @@ function angleErr(){
   const yaw=deg(Math.atan2(nh[0]*ref[1]-nh[1]*ref[0], nh[0]*ref[0]+nh[1]*ref[1]));
   return {total:deg(Math.acos(Math.min(1,Math.abs(dot(nh,ref))))),pitch,roll,yaw};
 }
+function wrapCount(){
+  const p=ST.p,f=frame(),half=physics().cov/2,F=p.FOV/2,ax=p.phase===1?f.e1:f.e2;let w=0;
+  for(const q of SCALPPTS){const s=toScan(q),d=sub(s,ST.blk.c);if(Math.abs(dot(d,f.n))<=half&&Math.abs(dot(d,ax))>F)w++;}
+  return w;
+}
 function runChecks(){
   const out=[],P=ST.pos,p=ST.p,ph=physics(),f=frame(),T=TASKS[ST.task];
   const ok=(c,t,why)=>out.push({c,t,why});
@@ -291,7 +301,7 @@ function runChecks(){
   ok(P.coil==='head','Dedicated head coil','A close-fitting receive coil gives much higher SNR than the body coil.');
   ok(P.pads,'Foam pads for immobilisation','Pads reduce head motion, which causes ghosting along the phase-encoding direction.');
   ok(P.ears,'Hearing protection','Gradient noise is loud; earplugs or headphones are required.');
-  ok(P.land==='nasion','Laser landmark on the nasion','Centres the head at the isocentre, where the field is most uniform.');
+  ok(P.land==='glabella'||P.land==='nasion','Laser landmark on the glabella (or nasion)','Centres the brain in the head coil at the isocentre, where the field is most uniform. The glabella is 1–2 cm above the nasion; both are used in practice – follow your local protocol.');
   ok(ST.blk.type===T.type,'Orientation: '+({ax:'axial',cor:'coronal',sag:'sagittal'})[T.type],'The task asks for this plane.');
   const ae=angleErr();
   const angTxt={ax:'Axial slices parallel to the AC–PC line',cor:'Coronal slices perpendicular to the AC–PC line',sag:'Sagittal slices parallel to the midline (falx)'}[ST.blk.type];
@@ -301,8 +311,7 @@ function runChecks(){
   for(const q of BRAINPTS){const s=toScan(q);if(inBlock(s,f,half,F))inn++;else{const d=dot(sub(s,ST.blk.c),f.n);if(d>0)top++;else bot++;}}
   const pct=100*inn/BRAINPTS.length;
   ok(pct>=98,'Whole brain covered ('+pct.toFixed(1)+'%)',ST.blk.type==='ax'?'Cover from the vertex to the foramen magnum.'+(pct<98?(top>bot?' Some brain is missed at the top (vertex) or one edge – move up or add slices.':' Some brain is missed at the bottom or one edge – move down or add slices.'):''):'Cover the whole brain from side to side or front to back, inside the FOV.');
-  let wrap=0;const ax=p.phase===1?f.e1:f.e2;
-  for(const q of SCALPPTS){const s=toScan(q),d=sub(s,ST.blk.c);if(Math.abs(dot(d,f.n))<=half&&Math.abs(dot(d,ax))>F)wrap++;}
+  const wrap=wrapCount();
   ok(wrap<3,'No wrap-around (aliasing)','The head must fit inside the FOV along the phase-encoding direction, or tissue outside folds into the image.');
   const want=T.seq==='t2'?'T2-weighted':'T1-weighted';
   ok(weighting(p.TR,p.TE)===want,'Contrast: '+want,'Task asks for '+want+'. T1: short TR/short TE; T2: long TR/long TE.');
@@ -322,52 +331,54 @@ function showChecks(){
 let anim=0;
 function drawPos(){
   const cv=$('posc'),g=cv.getContext('2d'),W=cv.width,H=cv.height,P=ST.pos;
-  g.clearRect(0,0,W,H);
-  // bore
-  const bx=W*0.42,bw=W*0.30;
+  const s=0.62, tableY=H-34, bx=W*0.52, bw=W*0.30, isoX=bx+bw/2, laserX=W*0.17;
   g.fillStyle='#dfe6f2';g.fillRect(0,0,W,H);
-  g.fillStyle='#b9c4d8';g.beginPath();g.roundRect(bx,20,bw,H-60,26);g.fill();
-  g.fillStyle='#eef2f9';g.beginPath();g.roundRect(bx+10,62,bw-20,H-150,40);g.fill();
-  g.fillStyle='#5A6472';g.font='12px system-ui';g.fillText('Magnet bore',bx+bw/2-34,40);
-  const iso=bx+bw/2;
-  g.strokeStyle='#EF476F';g.setLineDash([4,4]);g.beginPath();g.moveTo(iso,62);g.lineTo(iso,H-88);g.stroke();g.setLineDash([]);
-  g.fillStyle='#EF476F';g.fillText('Isocentre',iso-24,H-72);
-  // table + patient (slides in with anim 0..1)
-  const lz=LAND[P.land].z; // mm, head coordinate placed at laser
-  const scale=0.9, travel=(iso-(W*0.20))*anim;
-  const headTop=H-110, tableY=H-92;
-  g.fillStyle='#8a94a6';g.fillRect(20,tableY,W-40,10);
-  const hf=P.dir==='hf', sgn=hf?1:-1;
-  // head x (centre of brain) before travel: laser line at W*0.20 marks the landmark
-  const laserX=W*0.20;
-  const headCx=laserX+travel+sgn*(10-lz)*scale*0.55; // brain centre about +10 mm (MNI z)
-  g.save();
-  // body
-  const bodyX0=hf?headCx-sgn*0:headCx;
+  // magnet: outer housing and bore
+  g.fillStyle='#b9c4d8';g.beginPath();g.roundRect(bx,10,bw,H-20,26);g.fill();
+  g.fillStyle='#eef2f9';g.beginPath();g.roundRect(bx+12,46,bw-24,tableY-50,36);g.fill();
+  g.fillStyle='#5A6472';g.font='12px system-ui';g.textAlign='center';g.fillText('Magnet bore',isoX,30);
+  g.fillStyle='#8a94a6';g.fillRect(10,tableY,W-20,9); // table
+  const sg=P.dir==='hf'?1:-1, sup=P.pose==='supine';
+  const zL=LAND[P.land].z, target=laserX+(isoX-laserX)*anim;
+  const X=z=>target+sg*(z-zL)*s;
+  const Yp=y=>sup?tableY-(y+124)*s:tableY-(118-y)*s;   // supine: back of head on the table; prone: face down
+  // body (torso + neck) – simple shape continuing from the neck
   g.fillStyle='#F5C6A5';
-  const bodyStart=headCx-sgn*(58), bodyEnd=bodyStart-sgn*340;
-  g.beginPath();g.roundRect(Math.min(bodyStart,bodyEnd),headTop+18,Math.abs(bodyEnd-bodyStart),40,16);g.fill();
-  // head
-  g.beginPath();g.ellipse(headCx,headTop+30,46,32,0,0,7);g.fill();
-  // nose / face direction
-  const faceUp=P.pose==='supine';
-  g.beginPath();g.moveTo(headCx+sgn*(-6),headTop+30+(faceUp?-30:30));g.lineTo(headCx+sgn*10,headTop+30+(faceUp?-44:44));g.lineTo(headCx+sgn*18,headTop+30+(faceUp?-28:28));g.fill();
-  g.fillStyle='#1B1F3B';g.beginPath();g.arc(headCx+sgn*6,headTop+30+(faceUp?-18:18),3,0,7);g.fill();
-  if(P.pads){g.fillStyle='#06D6A0';g.fillRect(headCx-40,headTop-6,80,7);g.fillRect(headCx-40,headTop+60,80,7);}
-  if(P.ears){g.fillStyle='#FFD166';g.beginPath();g.arc(headCx-sgn*8,headTop+34,6,0,7);g.fill();}
-  if(P.coil==='head'){g.strokeStyle='#3A0CA3';g.lineWidth=4;g.beginPath();g.roundRect(headCx-58,headTop-22,116,104,18);g.stroke();
-    g.lineWidth=2;for(let i=-40;i<=40;i+=20){g.beginPath();g.moveTo(headCx+i,headTop-22);g.lineTo(headCx+i,headTop+82);g.stroke();}}
-  g.restore();
-  // laser (fixed on the gantry front, before travel)
+  g.beginPath();g.moveTo(X(-183),Yp(16));g.lineTo(X(-215),Yp(58));g.lineTo(X(-1600),Yp(58));g.lineTo(X(-1600),Yp(-118));g.lineTo(X(-183),Yp(-75));g.closePath();g.fill();
+  // head: real mid-sagittal outline of the 3D model
+  g.beginPath();PROF.forEach(([z,ya],i)=>i?g.lineTo(X(z),Yp(ya)):g.moveTo(X(z),Yp(ya)));
+  for(let i=PROF.length-1;i>=0;i--){const [z,,yp]=PROF[i];g.lineTo(X(z),Yp(yp));}
+  g.closePath();g.fill();g.strokeStyle='#d9a07c';g.lineWidth=1.5;g.stroke();
+  // eye, ear
+  g.fillStyle='#1B1F3B';g.beginPath();g.ellipse(X(-42),Yp(78),3,2,0,0,7);g.fill();
+  g.fillStyle='#e7ad86';g.beginPath();g.ellipse(X(-40),Yp(-12),7,11,0,0,7);g.fill();
+  if(P.ears){g.fillStyle='#FFD166';g.beginPath();g.arc(X(-40),Yp(-12),5,0,7);g.fill();}
+  if(P.pads){g.fillStyle='rgba(6,214,160,.55)';g.fillRect(Math.min(X(-75),X(45)),Yp(sup?-60:60),Math.abs(X(45)-X(-75)),Math.abs(Yp(-60)-Yp(-124+0))*(sup?1:1));}
+  if(P.coil==='head'){
+    const z0=-115,z1=110,top=sup?Yp(122):Yp(-128), bot=tableY-2;
+    g.strokeStyle='#3A0CA3';g.lineWidth=3.5;g.beginPath();g.roundRect(Math.min(X(z0),X(z1)),Math.min(top,bot),Math.abs(X(z1)-X(z0)),Math.abs(bot-top),16);g.stroke();
+    g.lineWidth=1.5;for(let z=z0+30;z<z1;z+=40){g.beginPath();g.moveTo(X(z),top);g.lineTo(X(z),bot);g.stroke();}
+  }
+  // landmark point on the skin
+  const yL=P.land==='vertex'?null:(P.land==='sternal'?58:profAnt(zL));
+  const lx=P.land==='vertex'?X(zL):X(zL), ly=P.land==='vertex'?Yp(-15):Yp(yL);
+  // isocentre line
+  g.strokeStyle='#EF476F';g.setLineDash([4,4]);g.lineWidth=1.5;g.beginPath();g.moveTo(isoX,46);g.lineTo(isoX,tableY);g.stroke();g.setLineDash([]);
+  g.fillStyle='#EF476F';g.font='12px system-ui';g.fillText('Isocentre',isoX,tableY-6);
+  // laser (on the gantry face, before the table moves)
   if(anim<0.02){g.strokeStyle='#ff2d2d';g.lineWidth=2;g.beginPath();g.moveTo(laserX,8);g.lineTo(laserX,tableY);g.stroke();
-    g.fillStyle='#ff2d2d';g.font='bold 12px system-ui';g.fillText('Laser: '+LAND[P.land].t,laserX+6,16);}
+    g.fillStyle='#ff2d2d';g.font='bold 12px system-ui';g.fillText('Laser',laserX,20);}
+  g.fillStyle='#ff2d2d';g.beginPath();g.arc(lx,ly,4.5,0,7);g.fill();
+  g.font='bold 12px system-ui';g.textAlign='left';
+  const lab=LAND[P.land].t; g.fillText(lab,lx+(sg>0?-g.measureText(lab).width-8:8),ly-8);
   g.fillStyle='#1B1F3B';g.font='12px system-ui';
-  g.fillText((hf?'Head first':'Feet first')+' · '+(P.pose==='supine'?'Supine':'Prone')+' · '+(P.coil==='head'?'Head coil':'Body coil'),12,H-12);
+  g.fillText((P.dir==='hf'?'Head first':'Feet first')+' · '+(sup?'Supine':'Prone')+' · '+(P.coil==='head'?'Head coil':'Body coil')+' · laser on '+lab.toLowerCase(),12,H-8);
 }
+function profAnt(z){for(let i=0;i<PROF.length-1;i++){const [z0,a0]=PROF[i],[z1,a1]=PROF[i+1];if(z>=z0&&z<=z1)return a0+(a1-a0)*(z-z0)/(z1-z0);}return PROF[PROF.length-1][1];}
 function moveIn(){
   ST.moved=false;anim=0;const t0=performance.now();$('movebtn').disabled=true;
   const step=now=>{anim=Math.min(1,(now-t0)/1400);drawPos();if(anim<1)requestAnimationFrame(step);else{
-    ST.L=[0,-15,LAND[ST.pos.land].z];
+    ST.L=[0,-2,LAND[ST.pos.land].z];
     ST.moved=true;['sag','cor','ax'].forEach(renderLocalizer);$('movebtn').disabled=false;
     $('posmsg').innerHTML='Patient at the isocentre. Localizers acquired – plan your slices in Step 2.';changed();}};
   requestAnimationFrame(step);
@@ -393,12 +404,12 @@ function autoPlan(){
   const R=[[0,0,0],[0,0,0],[0,0,0]];
   for(let i=0;i<3;i++)for(let j=0;j<3;j++){let s=0;for(let k=0;k<3;k++)s+=M[k][i]*Bm[k][j];R[i][j]=s;}
   ST.blk.R=R;
-  const ctrH=T.type==='ax'?[0,-18,(82+BRAIN_LOW)/2]:T.type==='cor'?[0,-17,8]:[0,-17,8];
+  const ctrH=T.type==='ax'?[0,-2,(82+BRAIN_LOW)/2]:T.type==='cor'?[0,-17,8]:[0,-2,8];
   ST.blk.c=toScan(ctrH);
-  const pr=T.seq==='t2'?SEQ.t2:SEQ.t1;Object.assign(ST.p,{TR:pr.TR,TE:pr.TE,ETL:pr.ETL,NEX:T.type==='sag'?2:1,FOV:230,Nf:256,Np:224});
+  const pr=T.seq==='t2'?SEQ.t2:SEQ.t1;Object.assign(ST.p,{TR:pr.TR,TE:pr.TE,ETL:pr.ETL,NEX:T.type==='sag'?2:1,FOV:240,Nf:256,Np:224});
   if(T.type==='ax'){ST.p.N=24;ST.p.thk=5;ST.p.gap=1;ST.p.phase=2;}
-  else if(T.type==='cor'){ST.p.N=26;ST.p.thk=5;ST.p.gap=1;ST.p.phase=1;}
-  else {ST.p.N=25;ST.p.thk=5;ST.p.gap=1;ST.p.phase=1;}
+  else if(T.type==='cor'){ST.p.N=31;ST.p.thk=5;ST.p.gap=1;ST.p.phase=1;}
+  else {ST.p.N=25;ST.p.thk=5;ST.p.gap=1;ST.p.phase=1;ST.p.TR=650;}
   syncInputs();changed();
 }
 
@@ -456,8 +467,8 @@ function init(){
   newPatient(); syncInputs(); changed();
 }
 Promise.resolve().then(()=>{if(!window.BRAIN3D)throw new Error('no data');
-  const bin=atob(window.BRAIN3D),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);D=new Float32Array(NV*4);
-  for(let i=0;i<NV;i++){const a=u[i],b=u[NV+i];D[i*4]=(a&15)/15;D[i*4+1]=(a>>4)/15;D[i*4+2]=(b&15)/15;D[i*4+3]=(b>>4)/15;}
+  const bin=atob(window.BRAIN3D),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);D=new Float32Array(NV*NC);
+  for(let i=0;i<NV;i++){const a=u[i],b=u[NV+i],c=u[2*NV+i],o=i*NC;D[o]=(a&15)/15;D[o+1]=(a>>4)/15;D[o+2]=(b&15)/15;D[o+3]=(b>>4)/15;D[o+4]=(c&15)/15;D[o+5]=(c>>4)/15;}
   buildPoints();init();$('planload').style.display='none';
 }).catch(e=>{$('planload').textContent='Could not load the 3D head data (brain3d.js). Keep brain3d.js in the same folder as index.html.';});
 window.__plan=ST; window.__planHandle=k=>handlePos(k); window.__planErr=()=>angleErr(); window.__planAuto=()=>autoPlan(); window.__planMove=()=>moveIn();
