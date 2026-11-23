@@ -1,6 +1,7 @@
 MRI Digital Twin – third-party notice
 
-The contrast lab uses grey and white matter maps from the MNI ICBM152 2009a
+The contrast lab and the planning lab (brain3d.js, downsampled to 2 mm) use
+grey and white matter maps from the MNI ICBM152 2009a
 nonlinear symmetric template, as distributed with the nilearn library.
 
 Copyright (C) 1993-2009 Louis Collins, McConnell Brain Imaging Centre,
